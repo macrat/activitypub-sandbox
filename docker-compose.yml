@@ -1,0 +1,25 @@
+version: '3'
+
+services:
+  web:
+    image: golang:latest
+    command: go run .
+    volumes:
+      - .:/activitypub-sandbox
+    working_dir: /activitypub-sandbox
+
+  ssl:
+    image: steveltn/https-portal:latest
+    ports:
+      - 80:80
+      - 443:443
+    depends_on:
+      - web
+    environment:
+      DOMAINS: '$HOSTNAME -> http://web:8000, $HOSTNAME => https://$HOSTNAME'
+      STAGE: 'production' # Don't use production until staging works
+      # FORCE_RENEW: 'true' # Uncomment to force renew of certificates
+      # DEBUG: 'true' # Uncomment to see debug messages
+    volumes:
+      - ./ssl_certs:/var/lib/https-portal
+
