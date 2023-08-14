@@ -5,11 +5,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/middleware"
 )
+
+func logRequestForDebug(c echo.Context, body any) {
+	r := c.Request()
+	rec := map[string]any{
+		"datetime": time.Now().Format(time.RFC3339),
+		"remote":   c.RealIP(),
+		"method":   r.Method,
+		"path":     r.URL.Path,
+		"headers":  r.Header,
+		"body":     body,
+	}
+
+	f, err := os.OpenFile("/request.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	json.NewEncoder(f).Encode(rec)
+}
 
 type Handler struct {
 	Hostname string
@@ -133,8 +155,10 @@ func (h *Handler) GetUserActor(c echo.Context) error {
 		},
 		"id":                fmt.Sprintf("https://%s/@%s", h.Hostname, username),
 		"type":              "Person",
+		"name":              "DEBUG",
 		"preferredUsername": username,
 		"summary":           "<p>デバッグ用ニセアカウント。</p>",
+		"published":         "2023-08-14T20:38:00+09:00",
 		"icon": map[string]string{
 			"type":      "Image",
 			"mediaType": "image/png",
@@ -155,11 +179,13 @@ func (h *Handler) GetUserActor(c echo.Context) error {
 
 func (h *Handler) PostInbox(c echo.Context) error {
 	var request map[string]any
-	if err := c.Bind(&request); err != nil {
+	if err := json.NewDecoder(c.Request().Body).Decode(&request); err != nil {
 		return c.JSON(400, map[string]string{
 			"error": "invalid request",
 		})
 	}
+
+	logRequestForDebug(c, request)
 
 	switch request["type"] {
 	case "Follow":
@@ -191,6 +217,7 @@ func (h *Handler) PostInboxFollow(c echo.Context, request map[string]any) error 
 
 	req, err := http.NewRequest("POST", request["actor"].(string), &accept)
 	if err != nil {
+		c.Logger().Printf("failed to prepare follow accept message: %s", err)
 		return c.JSON(500, map[string]string{
 			"error": "internal server error",
 		})
@@ -200,12 +227,14 @@ func (h *Handler) PostInboxFollow(c echo.Context, request map[string]any) error 
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		c.Logger().Printf("failed to send follow accept message: %s", err)
 		return c.JSON(500, map[string]string{
 			"error": "internal server error",
 		})
 	}
 
 	if resp.StatusCode != 200 {
+		c.Logger().Printf("follow accept message has denied: %s", err)
 		return c.JSON(500, map[string]string{
 			"error": "internal server error",
 		})

@@ -5,7 +5,8 @@ services:
     image: golang:latest
     command: go run .
     volumes:
-      - .:/activitypub-sandbox
+      - .:/activitypub-sandbox:ro
+      - ./request.log:/request.log
     working_dir: /activitypub-sandbox
 
   ssl:
@@ -22,4 +23,3 @@ services:
       # DEBUG: 'true' # Uncomment to see debug messages
     volumes:
       - ./ssl_certs:/var/lib/https-portal
-

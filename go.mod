@@ -1,6 +1,6 @@
 module github.com/macrat/activitypub-sandbox
 
-go 1.21.0
+go 1.20
 
 require (
 	github.com/labstack/echo v3.3.10+incompatible
